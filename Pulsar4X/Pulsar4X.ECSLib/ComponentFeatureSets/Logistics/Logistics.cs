@@ -36,7 +36,13 @@ namespace Pulsar4X.ECSLib
         }
         public override object Clone()
         {
-            throw new NotImplementedException();
+            return new LogiBaseDB() 
+            {
+                ListedItems = new Dictionary<ICargoable, (int count, int demandSupplyWeight)>(this.ListedItems),
+                ItemsWaitingPickup = new Dictionary<ICargoable, (Guid shipingEntity, double amountVolume)> (this.ItemsWaitingPickup),
+                ItemsInTransit = new Dictionary<ICargoable, (Guid shipingEntity, double amountVolume)>(this.ItemsInTransit),
+                TradeShipBids = new List<(Entity ship, LogisticsCycle.CargoTask cargoTask)>(this.TradeShipBids)
+            };
         }
     }
 
