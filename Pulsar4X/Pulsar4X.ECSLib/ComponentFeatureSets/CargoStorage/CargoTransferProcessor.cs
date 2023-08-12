@@ -58,8 +58,8 @@ namespace Pulsar4X.ECSLib
                 long amountTo = transferDB.CargoToDB.AddCargoByUnit(cargoItem, countToTransferThisTick);
                 
                 //update the total masses for these entites
-                transferDB.CargoFromDB.OwningEntity.GetDataBlob<MassVolumeDB>().UpdateMassTotal(transferDB.CargoFromDB);
-                transferDB.CargoToDB.OwningEntity.GetDataBlob<MassVolumeDB>().UpdateMassTotal(transferDB.CargoToDB);
+                transferDB.CargoFromDB.OwningEntity.GetDataBlob<MassVolumeDB>().InvalidateMassTotal();
+                transferDB.CargoToDB.OwningEntity.GetDataBlob<MassVolumeDB>().InvalidateMassTotal();
 
 
                 if(amountTo != amountFrom)
@@ -90,7 +90,7 @@ namespace Pulsar4X.ECSLib
             VolumeStorageDB cargo = entity.GetDataBlob<VolumeStorageDB>();
             double amountSuccess = cargo.AddCargoByUnit(item, amount);
             MassVolumeDB mv = entity.GetDataBlob<MassVolumeDB>();
-            mv.UpdateMassTotal(cargo);
+            mv.InvalidateMassTotal();
             return amountSuccess;
         }
 
@@ -105,7 +105,7 @@ namespace Pulsar4X.ECSLib
             VolumeStorageDB cargo = entity.GetDataBlob<VolumeStorageDB>();
             double amountSuccess = cargo.RemoveCargoByUnit(item, amount);
             MassVolumeDB mv = entity.GetDataBlob<MassVolumeDB>();
-            mv.UpdateMassTotal(cargo);
+            mv.InvalidateMassTotal();
             return amountSuccess;
         }
 
@@ -120,7 +120,7 @@ namespace Pulsar4X.ECSLib
             VolumeStorageDB cargo = entity.GetDataBlob<VolumeStorageDB>();
             double amountSuccess = cargo.AddRemoveCargoByMass(item, amountInMass);
             MassVolumeDB mv = entity.GetDataBlob<MassVolumeDB>();
-            mv.UpdateMassTotal(cargo);
+            mv.InvalidateMassTotal();
             return amountSuccess;
         }
 
@@ -135,7 +135,7 @@ namespace Pulsar4X.ECSLib
             VolumeStorageDB cargo = entity.GetDataBlob<VolumeStorageDB>();
             double amountSuccess = cargo.AddRemoveCargoByVolume(item, amountInVolume);
             MassVolumeDB mv = entity.GetDataBlob<MassVolumeDB>();
-            mv.UpdateMassTotal(cargo);
+            mv.InvalidateMassTotal();
             return amountSuccess;
         }
                 

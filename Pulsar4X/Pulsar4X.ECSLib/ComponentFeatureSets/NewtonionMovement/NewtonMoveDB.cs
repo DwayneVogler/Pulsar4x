@@ -216,7 +216,24 @@ namespace Pulsar4X.ECSLib
         public Vector3 CurrentVector_ms { get; internal set; }
 
         public Entity SOIParent { get; internal set; }
-        public double ParentMass { get; internal set; }
+        public double ParentMass
+        {
+            get
+            {
+                if (_parentMassInvalid)
+                {
+                    _parentMass = SOIParent?.GetDataBlob<MassVolumeDB>()?.MassDry ?? 0;
+                    _parentMassInvalid = _parentMass == 0;
+                }
+                return _parentMass;
+            }
+            private set
+            {
+                _parentMass = value;
+            }
+        }
+        private double _parentMass;
+        private bool _parentMassInvalid;
 
         private KeplerElements _ke;
 
@@ -248,7 +265,7 @@ namespace Pulsar4X.ECSLib
             CurrentVector_ms = velocity_ms;
             SOIParent = sphereOfInfluenceParent;
             ManuverDeltaV = manuverDeltaV;
-            ParentMass = SOIParent.GetDataBlob<MassVolumeDB>().MassDry;
+            _parentMassInvalid = true;
             LastProcessDateTime = sphereOfInfluenceParent.Manager.ManagerSubpulses.StarSysDateTime;
             
         }
@@ -262,9 +279,8 @@ namespace Pulsar4X.ECSLib
         {
             CurrentVector_ms = velocity_ms;
             SOIParent = sphereOfInfluenceParent;
-            ParentMass = SOIParent.GetDataBlob<MassVolumeDB>().MassDry;
+            _parentMassInvalid = true;
             LastProcessDateTime = sphereOfInfluenceParent.Manager.ManagerSubpulses.StarSysDateTime;
-            
         }
 
         public NewtonMoveDB(NewtonMoveDB db)
@@ -272,8 +288,7 @@ namespace Pulsar4X.ECSLib
             LastProcessDateTime = db.LastProcessDateTime;
             CurrentVector_ms = db.CurrentVector_ms;
             SOIParent = db.SOIParent;
-            ParentMass = db.ParentMass;
-            
+            _parentMassInvalid = true;
         }
         public override object Clone()
         {

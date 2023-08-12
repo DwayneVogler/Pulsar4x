@@ -16,7 +16,24 @@ namespace Pulsar4X.ECSLib
         /// <summary>
         /// Mass in Kg of this entity including all cargo and fuel
         /// </summary>
-        public double MassTotal {get; private set;}
+        public double MassTotal
+        {
+            get
+            {
+                if (_massTotalInvalid)
+                {
+                    _massTotal = MassDry + OwningEntity?.GetDataBlob<VolumeStorageDB>()?.TotalStoredMass ?? 0;
+                    _massTotalInvalid = _massTotal == 0;
+                }
+                return _massTotal;
+            }
+            private set
+            {
+                _massTotal = value;
+            }
+        }
+        private double _massTotal;
+        private bool _massTotalInvalid = true;
 
         /// <summary>
         /// Volume_km3 of this entity in Km^3.
@@ -155,17 +172,9 @@ namespace Pulsar4X.ECSLib
         /// <summary>
         /// Note that this does not update the density. density is dry.
         /// </summary>
-        /// <param name="cargo">optional VolumeStorageDB, saves time looking it up</param>
-        public void UpdateMassTotal(VolumeStorageDB cargo)
+        public void InvalidateMassTotal()
         {
-            MassTotal = MassDry + cargo.TotalStoredMass;
-        }
-        /// <summary>
-        /// Note that this does not update the density. density is dry.
-        /// </summary>
-        public void UpdateMassTotal()
-        {
-            UpdateMassTotal(OwningEntity.GetDataBlob<VolumeStorageDB>());
+            _massTotalInvalid = true;
         }
 
         /// <summary>
