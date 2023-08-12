@@ -348,7 +348,7 @@ namespace Pulsar4X.ECSLib
         internal void BulkSetDataBlob(int entityID, IEnumerable<BaseDataBlob> dataBlobs, bool updateListners = false)
         {
             // get Type indices
-            var blobsWithTypes = dataBlobs.TakeWhile((b) => b != null).Select((dataBlob) =>
+            var blobsWithTypes = dataBlobs.Where((b) => b != null).Select((dataBlob) =>
             {
                 int typeIndex;
                 TryGetTypeIndex(dataBlob.GetType(), out typeIndex);
