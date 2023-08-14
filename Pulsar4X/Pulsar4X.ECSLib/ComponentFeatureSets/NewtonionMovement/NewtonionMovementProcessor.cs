@@ -163,18 +163,15 @@ namespace Pulsar4X.ECSLib
                         var parentVelocity = newtonMoveDB.SOIParent.GetDataBlob<NewtonMoveDB>().CurrentVector_ms;
                         parentrelativeVector = newtonMoveDB.CurrentVector_ms + parentVelocity;
                     }
-                    parentMass_kg = newParent.GetDataBlob<MassVolumeDB>().MassDry;
                     
                     Vector3 posrelativeToNewParent = positionDB.AbsolutePosition - newParent.GetDataBlob<PositionDB>(_posDBIdx).AbsolutePosition;
 
 
                     var dateTime = dateTimeNow + TimeSpan.FromSeconds(deltaSeconds - secondsToItterate);
-                    //double sgp = GMath.StandardGravitationalParameter(parentMass_kg + mass_Kg);
                     
 
                     kE = OrbitMath.KeplerFromPositionAndVelocity(sgp, posrelativeToNewParent, parentrelativeVector, dateTime);
                     positionDB.SetParent(newParent);
-                    newtonMoveDB.ParentMass = parentMass_kg;
                     newtonMoveDB.SOIParent = newParent;
                     newtonMoveDB.CurrentVector_ms = parentrelativeVector;
                     newtonMoveDB.UpdateKeplerElements(kE);

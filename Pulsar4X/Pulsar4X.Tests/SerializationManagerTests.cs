@@ -7,6 +7,7 @@ using System.Linq;
 namespace Pulsar4X.Tests
 {
     using Microsoft.VisualStudio.TestPlatform.ObjectModel;
+    using Newtonsoft.Json.Linq;
     using NUnit.Framework;
 
     [TestFixture]
@@ -22,11 +23,7 @@ namespace Pulsar4X.Tests
         [SetUp]
         public void PerTestSetup() 
         {
-            _testFilename = Path.GetTempFileName();
-            if (File.Exists(_testFilename))
-                File.Delete(_testFilename);
-            string filePart = Path.ChangeExtension(Path.GetFileNameWithoutExtension(_testFilename), "json");
-            _testFilename = Path.Combine(SerializationManager.GetWorkingDirectory(), filePart);
+            _testFilename = TestingUtilities.GetTestFilepath();
         }
 
         [TearDown]
@@ -184,6 +181,26 @@ namespace Pulsar4X.Tests
             Assert.AreEqual(exportedCount, importedCount);
         }
 
+        [TestCase(10, false)]
+        public void ExportImportExportMakesIdenticalFiles(int numSystems, bool generateSol)
+        {
+            string secondFile = TestingUtilities.GetTestFilepath();
+            try
+            {
+                Game exportedGame = TestingUtilities.CreateTestUniverse(numSystems, _testTime, generateSol);
+                SerializationManager.Export(exportedGame, _testFilename);
+                Game firstImport = SerializationManager.ImportGame(_testFilename);
+                SerializationManager.Export(firstImport, secondFile);
+
+                Assert.IsTrue(TestingUtilities.FileCompare(_testFilename, secondFile));
+            }
+            finally
+            {
+                if(File.Exists(secondFile))
+                    File.Delete(secondFile);
+            }
+        }
+
         // <?TODO: Expand this region out to cover many more DBs, entities, and cases.
 
         #endregion Imported Game is same as exported Game
@@ -208,51 +225,6 @@ namespace Pulsar4X.Tests
         // <?TODO: Expand this region out to cover many more DBs, entities, and cases.
 
         #endregion Imported Games are Valid Games
-
-        [Test]
-        public void CompareLoadedGameWithOriginal() //TODO do this after a few game ticks and check the comparitiveTests again. 
-        {
-            //create a new game
-            Game newGame = TestingUtilities.CreateTestUniverse(10, _testTime, true);
-
-            Entity ship = newGame.GlobalManager.GetFirstEntityWithDataBlob<TransitableDB>();
-            StarSystem firstSystem = newGame.Systems.First().Value;
-            DateTime jumpTime = StaticRefLib.CurrentDateTime + TimeSpan.FromMinutes(1);
-
-            //insert a jump so that we can compair timeloop dictionary
-            InterSystemJumpProcessor.SetJump(newGame, jumpTime,  firstSystem, jumpTime, ship);
-
-            // lets create a good saveGame
-            SerializationManager.Export(newGame, _testFilename);
-            //then load it:
-            Game loadedGame = SerializationManager.ImportGame(_testFilename);
-
-            //run some tests
-            ComparitiveTests(newGame, loadedGame);
-        }
-
-
-        void ComparitiveTests(Game original, Game loadedGame)
-        {
-            StarSystem firstOriginal = original.Systems.First().Value;
-            StarSystem firstLoaded = loadedGame.Systems.First().Value;
-
-            Assert.AreEqual(firstOriginal.Guid, firstLoaded.Guid);
-            Assert.AreEqual(firstOriginal.NameDB.DefaultName, firstLoaded.NameDB.DefaultName);
-  
-            Assert.AreEqual(original.GamePulse, loadedGame.GamePulse);
-
-            Assert.AreEqual(firstOriginal.ManagerSubpulses.GetTotalNumberOfProceses(), firstLoaded.ManagerSubpulses.GetTotalNumberOfProceses());
-            Assert.AreEqual(firstOriginal.ManagerSubpulses.GetInteruptDateTimes(), firstLoaded.ManagerSubpulses.GetInteruptDateTimes());
-
-            Assert.AreEqual(original.GlobalManager.NumberOfGlobalEntites, loadedGame.GlobalManager.NumberOfGlobalEntites);
-
-            var originalEntitiesList = original.GlobalManager.Entities.Where(x => x != null).ToList();
-            var loadedEntitiesList = loadedGame.GlobalManager.Entities.Where(x => x != null).ToList();
-
-            Assert.AreEqual(originalEntitiesList.Count, loadedEntitiesList.Count);
-            Assert.AreEqual(originalEntitiesList.Select(x => x.Guid).OrderBy(x => x).ToList(), loadedEntitiesList.Select(x => x.Guid).OrderBy(x => x).ToList());
-        }
 
 
         [Test]
@@ -365,71 +337,6 @@ namespace Pulsar4X.Tests
             Assert.AreEqual(importedSystem, system);
         }
 
-        /// <summary>
-        /// apears to test two saves to confirm that they are the same
-        /// </summary>
-        [Test]        
-        public void SaveGameConsistency()
-        {
-            const int maxTries = 10;
-            string testFilename2 = null; 
-            try
-            {
-                testFilename2 = Path.GetTempFileName();
-                if (File.Exists(testFilename2))
-                    File.Delete(testFilename2);
-                string filePart = Path.ChangeExtension(Path.GetFileNameWithoutExtension(testFilename2), "json");
-                testFilename2 = Path.Combine(SerializationManager.GetWorkingDirectory(), filePart);
-
-                for (int numTries = 0; numTries < maxTries; numTries++)
-                {
-                    Game _game = TestingUtilities.CreateTestUniverse(10);
-                    SerializationManager.Export(_game, _testFilename);
-                    _game = SerializationManager.ImportGame(_testFilename);
-                    SerializationManager.Export(_game, testFilename2);
-
-                    var fs1 = new FileStream(Path.Combine(SerializationManager.GetWorkingDirectory(), _testFilename), FileMode.Open);
-                    var fs2 = new FileStream(Path.Combine(SerializationManager.GetWorkingDirectory(), testFilename2), FileMode.Open);
-
-                    if (fs1.Length == fs2.Length)
-                    {
-                        // Read and compare a byte from each file until either a
-                        // non-matching set of bytes is found or until the end of
-                        // file1 is reached.
-                        int file1Byte;
-                        int file2Byte;
-                        do
-                        {
-                            // Read one byte from each file.
-                            file1Byte = fs1.ReadByte();
-                            file2Byte = fs2.ReadByte();
-                        } while ((file1Byte == file2Byte) && (file1Byte != -1));
-
-                        // Close the files.
-                        fs1.Close();
-                        fs2.Close();
-
-                        // Return the success of the comparison. "file1byte" is 
-                        // equal to "file2byte" at this point only if the files are 
-                        // the same.
-                        if (file1Byte - file2Byte == 0)
-                        {
-                            Assert.Pass("Save Games consistent on try #" + (numTries + 1));
-                        }
-                    }
-
-                    fs1.Close();
-                    fs2.Close();
-                }
-                Assert.Fail("SaveGameConsistency could not be verified. Please ensure saves are properly loading and saving.");
-            }
-            finally
-            {
-                if (File.Exists(testFilename2))
-                    File.Delete(testFilename2);
-            }
-        }
-
         [Test]
         public void TestSingleSystemSave()
         {
@@ -441,8 +348,113 @@ namespace Pulsar4X.Tests
             StaticDataManager.ExportStaticData(sol, "solsave.json");
         }
 
+    }
 
 
+    [TestFixture]
+    [Description("Tests for differences between a saved and loaded game.")]
+    internal class SerializationManagerBeforeAfterTests
+    {
+        private readonly string _testFilename = TestingUtilities.GetTestFilepath();
+        private readonly DateTime _testTime = DateTime.Now;
+        private Game _originalGame;
+        private Game _loadedGame;
 
+        [OneTimeSetUp]
+        public void Setup()
+        {
+            //create a new game
+            _originalGame = TestingUtilities.CreateTestUniverse(10, _testTime, true);
+
+            Entity ship = _originalGame.GlobalManager.GetFirstEntityWithDataBlob<TransitableDB>();
+            StarSystem firstSystem = _originalGame.Systems.First().Value;
+            DateTime jumpTime = StaticRefLib.CurrentDateTime + TimeSpan.FromMinutes(1);
+
+            //insert a jump so that we can compair timeloop dictionary
+            InterSystemJumpProcessor.SetJump(_originalGame, jumpTime, firstSystem, jumpTime, ship);
+
+            // lets create a good saveGame
+            SerializationManager.Export(_originalGame, _testFilename);
+            //then load it:
+            _loadedGame = SerializationManager.ImportGame(_testFilename);
+        }
+
+        [OneTimeTearDown]
+        public void TearDown()
+        {
+            if (File.Exists(_testFilename))
+                File.Delete(_testFilename);
+        }
+
+        //TODO do this after a few game ticks and check the comparitiveTests again. 
+
+        [Test]
+        public void OriginalAndLoadedHaveSameSystemKeys()
+        {
+            Assert.IsTrue(EqualBy(_originalGame.Systems, _loadedGame.Systems, s => s.Key));
+        }
+
+        [Test]
+        public void OriginalAndLoadedHaveSameSystemGuids()
+        {
+            Assert.IsTrue(EqualBy(_originalGame.Systems, _loadedGame.Systems, s => s.Value.Guid));
+        }
+
+        [Test]
+        public void OriginalAndLoadedHaveSameSystemNames()
+        {
+            Assert.IsTrue(EqualBy(_originalGame.Systems, _loadedGame.Systems, s => s.Value.NameDB.DefaultName));
+        }
+
+        [Test]
+        public void OriginalAndLoadedHaveSameGameTime()
+        {
+            Assert.AreEqual(_originalGame.GamePulse, _loadedGame.GamePulse);
+        }
+
+        [Test]
+        public void OriginalAndLoadedHaveSameNumberOfProceses()
+        {
+            Assert.AreEqual(_originalGame.GlobalManager.ManagerSubpulses.GetTotalNumberOfProceses(), _loadedGame.GlobalManager.ManagerSubpulses.GetTotalNumberOfProceses());
+        }
+
+        [Test]
+        public void OriginalAndLoadedHaveSameGlobalManagerInterrupts()
+        {
+            Assert.IsTrue(EqualBy(
+                _originalGame.GlobalManager.ManagerSubpulses.GetInteruptDateTimes(),
+                _loadedGame.GlobalManager.ManagerSubpulses.GetInteruptDateTimes(),
+                dt => dt));
+        }
+
+        [Test]
+        public void OriginalAndLoadedFistSystemsHaveSameInterrupts()
+        {
+            Assert.IsTrue(EqualBy(
+                _originalGame.Systems.First().Value.ManagerSubpulses.GetInteruptDateTimes(),
+                _loadedGame.Systems.First().Value.ManagerSubpulses.GetInteruptDateTimes(),
+                dt => dt));
+        }
+
+        [Test]
+        public void OriginalAndLoadedHaveSameNumberOfGlobalEntites()
+        {
+            Assert.AreEqual(_originalGame.GlobalManager.NumberOfGlobalEntites, _loadedGame.GlobalManager.NumberOfGlobalEntites);
+        }
+
+        [Test]
+        public void OriginalAndLoadedHaveSameEntityGuids()
+        {
+            Assert.IsTrue(EqualBy(
+                _originalGame.GlobalManager.Entities.Where(x => x != null), 
+                _loadedGame.GlobalManager.Entities.Where(x => x != null), 
+                e => e.Guid));
+        }
+
+        private static bool EqualBy<TSource, TKey>(IEnumerable<TSource> first, IEnumerable<TSource> second, Func<TSource, TKey> selector)
+        {
+            return first.Select(f => selector(f)).Intersect(second.Select(f => selector(f))).Count()
+                == first.Select(f => selector(f)).Union(second.Select(f => selector(f))).Count();
+        }
     }
 }

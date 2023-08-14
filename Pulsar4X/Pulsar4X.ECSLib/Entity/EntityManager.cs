@@ -171,13 +171,7 @@ namespace Pulsar4X.ECSLib
 
             //the below chunk of code was moved from Entity constructor. this allows the entity to be fully populated and helps with entityChangeLisnters. 
             if(dataBlobs != null)
-            foreach (BaseDataBlob dataBlob in dataBlobs)
-            {
-                if (dataBlob != null)
-                {
-                    SetDataBlob(entityID, dataBlob, false);
-                }
-            }
+                BulkSetDataBlob(entityID, dataBlobs, false);
 
             UpdateListners(_entities[entityID], null, EntityChangeType.EntityAdded);
 
@@ -346,6 +340,42 @@ namespace Pulsar4X.ECSLib
             dataBlob.OwningEntity.Manager.ManagerSubpulses.AddSystemInterupt(dataBlob);
             if(updateListners)
                 UpdateListners(_entities[entityID], dataBlob, EntityChangeType.DBAdded);
+        }
+
+        /// <summary>
+        /// Breaks setting of data blobs into multiple stages so that blobs which depend on other blobs will not execute their OnSetToEntity code until the parent has all needed blobs.
+        /// </summary>
+        internal void BulkSetDataBlob(int entityID, IEnumerable<BaseDataBlob> dataBlobs, bool updateListners = false)
+        {
+            // get Type indices
+            var blobsWithTypes = dataBlobs.Where((b) => b != null).Select((dataBlob) =>
+            {
+                int typeIndex;
+                TryGetTypeIndex(dataBlob.GetType(), out typeIndex);
+                return (dataBlob, typeIndex);
+            });
+
+            // change raw data
+            foreach(var (dataBlob, typeIndex) in blobsWithTypes)
+            {
+                _dataBlobMap[typeIndex][entityID] = dataBlob;
+                EntityMasks[entityID][typeIndex] = true;
+                dataBlob.OwningEntity = _entities[entityID];
+            }
+
+            //process data changes
+            foreach (var (dataBlob, typeIndex) in blobsWithTypes)
+            {
+                dataBlob.OnSetToEntity();
+            }
+
+            //wire up to the rest of the system
+            foreach (var (dataBlob, typeIndex) in blobsWithTypes)
+            {
+                dataBlob.OwningEntity.Manager.ManagerSubpulses.AddSystemInterupt(dataBlob);
+                if (updateListners)
+                    UpdateListners(_entities[entityID], dataBlob, EntityChangeType.DBAdded);
+            }
         }
 
         internal void RemoveDataBlob<T>(int entityID) where T : BaseDataBlob
